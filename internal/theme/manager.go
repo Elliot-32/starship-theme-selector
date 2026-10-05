@@ -1,0 +1,327 @@
+package theme
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/pelletier/go-toml/v2"
+)
+
+type Source string
+
+const (
+	SourceBuiltin Source = "built-in"
+	SourceCustom  Source = "custom"
+)
+
+type Theme struct {
+	Name   string
+	Source Source
+	Path   string
+}
+
+type Paths struct {
+	ConfigDir   string
+	ThemeDir    string
+	SymbolsFile string
+	Target      string
+}
+
+type Manager struct {
+	Starship       string
+	Paths          Paths
+	DefaultSymbols []byte
+	WorkDir        string
+}
+
+func DefaultPaths() (Paths, error) {
+	configHome, err := os.UserConfigDir()
+	if err != nil {
+		return Paths{}, fmt.Errorf("resolve user config dir: %w", err)
+	}
+
+	configDir := os.Getenv("STHEME_CONFIG_DIR")
+	if configDir == "" {
+		configDir = filepath.Join(configHome, "stheme")
+	}
+
+	themeDir := os.Getenv("STHEME_THEME_DIR")
+	if themeDir == "" {
+		themeDir = filepath.Join(configDir, "themes")
+	}
+
+	symbolsFile := os.Getenv("STHEME_SYMBOLS")
+	if symbolsFile == "" {
+		symbolsFile = filepath.Join(configDir, "os-symbols.toml")
+	}
+
+	target := os.Getenv("STARSHIP_CONFIG")
+	if target == "" {
+		target = filepath.Join(configHome, "starship.toml")
+	}
+
+	return Paths{
+		ConfigDir:   configDir,
+		ThemeDir:    themeDir,
+		SymbolsFile: symbolsFile,
+		Target:      target,
+	}, nil
+}
+
+func New(starship string, paths Paths, defaultSymbols []byte) (*Manager, error) {
+	if starship == "" {
+		var err error
+		starship, err = exec.LookPath("starship")
+		if err != nil {
+			return nil, errors.New("starship was not found in PATH")
+		}
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("get current directory: %w", err)
+	}
+	return &Manager{
+		Starship:       starship,
+		Paths:          paths,
+		DefaultSymbols: append([]byte(nil), defaultSymbols...),
+		WorkDir:        cwd,
+	}, nil
+}
+
+func (m *Manager) Discover(ctx context.Context) ([]Theme, error) {
+	byName := map[string]Theme{}
+
+	cmd := exec.CommandContext(ctx, m.Starship, "preset", "--list")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("list Starship presets: %w", err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" {
+			continue
+		}
+		byName[name] = Theme{Name: name, Source: SourceBuiltin}
+	}
+
+	entries, err := os.ReadDir(m.Paths.ThemeDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read custom theme directory: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || strings.ToLower(filepath.Ext(entry.Name())) != ".toml" {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		byName[name] = Theme{
+			Name:   name,
+			Source: SourceCustom,
+			Path:   filepath.Join(m.Paths.ThemeDir, entry.Name()),
+		}
+	}
+
+	themes := make([]Theme, 0, len(byName))
+	for _, item := range byName {
+		themes = append(themes, item)
+	}
+	sort.Slice(themes, func(i, j int) bool {
+		return strings.ToLower(themes[i].Name) < strings.ToLower(themes[j].Name)
+	})
+	return themes, nil
+}
+
+func (m *Manager) Find(ctx context.Context, name string) (Theme, error) {
+	themes, err := m.Discover(ctx)
+	if err != nil {
+		return Theme{}, err
+	}
+	for _, item := range themes {
+		if item.Name == name {
+			return item, nil
+		}
+	}
+	return Theme{}, fmt.Errorf("theme %q not found", name)
+}
+
+func (m *Manager) themeBytes(ctx context.Context, item Theme) ([]byte, error) {
+	if item.Source == SourceCustom {
+		data, err := os.ReadFile(item.Path)
+		if err != nil {
+			return nil, fmt.Errorf("read custom theme %q: %w", item.Name, err)
+		}
+		return data, nil
+	}
+
+	cmd := exec.CommandContext(ctx, m.Starship, "preset", item.Name)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("render Starship preset %q: %w", item.Name, err)
+	}
+	return out, nil
+}
+
+func (m *Manager) symbolsBytes() ([]byte, error) {
+	data, err := os.ReadFile(m.Paths.SymbolsFile)
+	if err == nil {
+		return data, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read os.symbols override: %w", err)
+	}
+	return append([]byte(nil), m.DefaultSymbols...), nil
+}
+
+func Merge(themeData, symbolsData []byte) ([]byte, error) {
+	var doc map[string]any
+	if err := toml.Unmarshal(themeData, &doc); err != nil {
+		return nil, fmt.Errorf("parse theme TOML: %w", err)
+	}
+	if doc == nil {
+		doc = map[string]any{}
+	}
+
+	var override struct {
+		OS struct {
+			Symbols map[string]any `toml:"symbols"`
+		} `toml:"os"`
+	}
+	if err := toml.Unmarshal(symbolsData, &override); err != nil {
+		return nil, fmt.Errorf("parse os.symbols override: %w", err)
+	}
+	if len(override.OS.Symbols) == 0 {
+		return nil, errors.New("os.symbols override is empty")
+	}
+
+	osTable, ok := doc["os"].(map[string]any)
+	if !ok || osTable == nil {
+		osTable = map[string]any{}
+	}
+	// Intentional full replacement: keys from the theme's original [os.symbols]
+	// must not survive unless they are present in the override table.
+	osTable["symbols"] = override.OS.Symbols
+	doc["os"] = osTable
+
+	out, err := toml.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("encode merged Starship config: %w", err)
+	}
+	return out, nil
+}
+
+func (m *Manager) Build(ctx context.Context, item Theme) ([]byte, error) {
+	themeData, err := m.themeBytes(ctx, item)
+	if err != nil {
+		return nil, err
+	}
+	symbolsData, err := m.symbolsBytes()
+	if err != nil {
+		return nil, err
+	}
+	return Merge(themeData, symbolsData)
+}
+
+func (m *Manager) render(ctx context.Context, config []byte, width int) (string, error) {
+	tmp, err := os.CreateTemp("", "stheme-preview-*.toml")
+	if err != nil {
+		return "", fmt.Errorf("create preview config: %w", err)
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	if _, err := tmp.Write(config); err != nil {
+		tmp.Close()
+		return "", fmt.Errorf("write preview config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("close preview config: %w", err)
+	}
+
+	if width < 20 {
+		width = 80
+	}
+	cmd := exec.CommandContext(ctx, m.Starship,
+		"prompt",
+		"--status", "0",
+		"--terminal-width", fmt.Sprint(width),
+		"--path", m.WorkDir,
+	)
+	cmd.Env = append(os.Environ(), "STARSHIP_CONFIG="+name)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(out))
+		if message == "" {
+			message = err.Error()
+		}
+		return "", fmt.Errorf("render preview: %s", message)
+	}
+	return strings.TrimRight(string(out), "\r\n"), nil
+}
+
+func (m *Manager) Preview(ctx context.Context, item Theme, width int) (string, error) {
+	config, err := m.Build(ctx, item)
+	if err != nil {
+		return "", err
+	}
+	return m.render(ctx, config, width)
+}
+
+func (m *Manager) Apply(ctx context.Context, item Theme) error {
+	config, err := m.Build(ctx, item)
+	if err != nil {
+		return err
+	}
+	if _, err := m.render(ctx, config, 80); err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(m.Paths.Target)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create Starship config directory: %w", err)
+	}
+
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(m.Paths.Target); err == nil {
+		mode = info.Mode().Perm()
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("stat existing Starship config: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(dir, ".starship.toml.*")
+	if err != nil {
+		return fmt.Errorf("create temporary Starship config: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return fmt.Errorf("set temporary config mode: %w", err)
+	}
+	if _, err := bytes.NewReader(config).WriteTo(tmp); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temporary Starship config: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("sync temporary Starship config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temporary Starship config: %w", err)
+	}
+	if err := os.Rename(tmpName, m.Paths.Target); err != nil {
+		return fmt.Errorf("replace Starship config: %w", err)
+	}
+	cleanup = false
+	return nil
+}
