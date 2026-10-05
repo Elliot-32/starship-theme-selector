@@ -48,17 +48,17 @@ func DefaultPaths() (Paths, error) {
 		return Paths{}, fmt.Errorf("resolve user config dir: %w", err)
 	}
 
-	configDir := os.Getenv("STHEME_CONFIG_DIR")
+	configDir := os.Getenv("SSTS_CONFIG_DIR")
 	if configDir == "" {
-		configDir = filepath.Join(configHome, "stheme")
+		configDir = filepath.Join(configHome, "ssts")
 	}
 
-	themeDir := os.Getenv("STHEME_THEME_DIR")
+	themeDir := os.Getenv("SSTS_THEME_DIR")
 	if themeDir == "" {
 		themeDir = filepath.Join(configDir, "themes")
 	}
 
-	symbolsFile := os.Getenv("STHEME_SYMBOLS")
+	symbolsFile := os.Getenv("SSTS_SYMBOLS")
 	if symbolsFile == "" {
 		symbolsFile = filepath.Join(configDir, "os-symbols.toml")
 	}
@@ -240,19 +240,19 @@ func previewEnvironment(configPath string) []string {
 }
 
 func CreatePreviewProject(ctx context.Context) (string, func(), error) {
-	root, err := os.MkdirTemp("", "stheme-preview-*")
+	root, err := os.MkdirTemp("", "ssts-preview-*")
 	if err != nil {
 		return "", nil, fmt.Errorf("create preview project: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(root) }
-	dir := filepath.Join(root, "stheme-preview")
+	dir := filepath.Join(root, "ssts-preview")
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		cleanup()
 		return "", nil, fmt.Errorf("create preview project directory: %w", err)
 	}
 	projectFiles := map[string][]byte{
-		"pyproject.toml": []byte("[project]\nname = 'stheme-preview'\nversion = '0.1.0'\nrequires-python = '>=3.11'\n"),
-		"main.py":        []byte("print('stheme preview')\n"),
+		"pyproject.toml": []byte("[project]\nname = 'ssts-preview'\nversion = '0.1.0'\nrequires-python = '>=3.11'\n"),
+		"main.py":        []byte("print('ssts preview')\n"),
 	}
 	for name, data := range projectFiles {
 		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
@@ -261,7 +261,7 @@ func CreatePreviewProject(ctx context.Context) (string, func(), error) {
 		}
 	}
 
-	// Git is optional for stheme itself, but when available we make the preview
+	// Git is optional for ssts itself, but when available we make the preview
 	// a real repository so Starship renders git_branch/git_status exactly as it
 	// would in a project. The committed Python project files keep the preview
 	// status clean.
@@ -269,7 +269,7 @@ func CreatePreviewProject(ctx context.Context) (string, func(), error) {
 		commands := [][]string{
 			{"-C", dir, "init", "-q", "-b", "main"},
 			{"-C", dir, "add", "pyproject.toml", "main.py"},
-			{"-C", dir, "-c", "user.name=stheme", "-c", "user.email=preview@invalid", "commit", "-qm", "preview"},
+			{"-C", dir, "-c", "user.name=ssts", "-c", "user.email=preview@invalid", "commit", "-qm", "preview"},
 		}
 		for _, args := range commands {
 			cmd := exec.CommandContext(ctx, git, args...)
@@ -284,7 +284,7 @@ func CreatePreviewProject(ctx context.Context) (string, func(), error) {
 }
 
 func (m *Manager) render(ctx context.Context, config []byte, width int, workDir string) (string, error) {
-	tmp, err := os.CreateTemp("", "stheme-preview-*.toml")
+	tmp, err := os.CreateTemp("", "ssts-preview-*.toml")
 	if err != nil {
 		return "", fmt.Errorf("create preview config: %w", err)
 	}

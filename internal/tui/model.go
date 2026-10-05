@@ -10,7 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/Elliot-32/stheme/internal/theme"
+	"github.com/Elliot-32/starship-theme-selector/internal/theme"
 )
 
 const (
@@ -91,7 +91,7 @@ func New(manager *theme.Manager, themes []theme.Theme) Model {
 		items = append(items, item{theme: t})
 	}
 	l := list.New(items, delegate{}, 42, 18)
-	l.Title = "stheme — Starship themes"
+	l.Title = "Starship Theme Selector"
 	l.SetShowStatusBar(true)
 	l.SetFilteringEnabled(true)
 	l.SetShowHelp(true)

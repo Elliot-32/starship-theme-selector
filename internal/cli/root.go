@@ -9,9 +9,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 
-	"github.com/Elliot-32/stheme/internal/assets"
-	"github.com/Elliot-32/stheme/internal/theme"
-	"github.com/Elliot-32/stheme/internal/tui"
+	"github.com/Elliot-32/starship-theme-selector/internal/assets"
+	"github.com/Elliot-32/starship-theme-selector/internal/theme"
+	"github.com/Elliot-32/starship-theme-selector/internal/tui"
 )
 
 func New(version string) (*cobra.Command, error) {
@@ -28,7 +28,7 @@ func New(version string) (*cobra.Command, error) {
 
 func newRoot(version string, manager *theme.Manager) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "stheme [theme]",
+		Use:           "ssts [theme]",
 		Short:         "Pick and apply Starship themes",
 		Version:       version,
 		SilenceUsage:  true,
@@ -62,7 +62,7 @@ func newRoot(version string, manager *theme.Manager) *cobra.Command {
 		Short: "Print version",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			fmt.Fprintf(cmd.OutOrStdout(), "stheme version %s\n", version)
+			fmt.Fprintf(cmd.OutOrStdout(), "ssts version %s\n", version)
 		},
 	})
 
@@ -165,7 +165,7 @@ func isTerminal(file *os.File) bool {
 }
 
 func formatError(err error) string {
-	return "stheme: " + strings.TrimSpace(err.Error())
+	return "ssts: " + strings.TrimSpace(err.Error())
 }
 
 func Execute(root *cobra.Command) int {

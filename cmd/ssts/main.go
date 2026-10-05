@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/Elliot-32/stheme/internal/cli"
+	"github.com/Elliot-32/starship-theme-selector/internal/cli"
 )
 
 var version = "dev"
@@ -32,7 +32,7 @@ func resolvedVersion(injected string) string {
 func main() {
 	root, err := cli.New(resolvedVersion(version))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "stheme:", err)
+		fmt.Fprintln(os.Stderr, "ssts:", err)
 		os.Exit(1)
 	}
 	os.Exit(cli.Execute(root))

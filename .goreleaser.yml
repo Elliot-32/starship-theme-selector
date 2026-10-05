@@ -1,11 +1,11 @@
 version: 2
 
-project_name: stheme
+project_name: starship-theme-selector
 
 builds:
-  - id: stheme
-    main: ./cmd/stheme
-    binary: stheme
+  - id: ssts
+    main: ./cmd/ssts
+    binary: ssts
     env:
       - CGO_ENABLED=0
     goos:

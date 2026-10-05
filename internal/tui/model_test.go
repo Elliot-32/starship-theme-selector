@@ -8,7 +8,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"github.com/Elliot-32/stheme/internal/theme"
+	"github.com/Elliot-32/starship-theme-selector/internal/theme"
 )
 
 func TestInitRendersSelectedThemePreview(t *testing.T) {

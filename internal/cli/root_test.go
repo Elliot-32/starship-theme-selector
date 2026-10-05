@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Elliot-32/stheme/internal/theme"
+	"github.com/Elliot-32/starship-theme-selector/internal/theme"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -18,7 +18,7 @@ func TestVersionCommand(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(out.String()); got != "stheme version 1.2.3" {
+	if got := strings.TrimSpace(out.String()); got != "ssts version 1.2.3" {
 		t.Fatalf("version output = %q", got)
 	}
 }

@@ -1,4 +1,4 @@
-module github.com/Elliot-32/stheme
+module github.com/Elliot-32/starship-theme-selector
 
 go 1.26.0
 

@@ -161,8 +161,8 @@ func TestCreatePreviewProjectProvidesPythonAndGitContext(t *testing.T) {
 	}
 	defer cleanup()
 
-	if filepath.Base(dir) != "stheme-preview" {
-		t.Fatalf("preview dir base = %q, want stheme-preview", filepath.Base(dir))
+	if filepath.Base(dir) != "ssts-preview" {
+		t.Fatalf("preview dir base = %q, want ssts-preview", filepath.Base(dir))
 	}
 	for _, name := range []string{"pyproject.toml", "main.py"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
