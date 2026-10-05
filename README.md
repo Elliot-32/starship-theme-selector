@@ -63,8 +63,3 @@ Generate completion with:
 ssts completion zsh        # or bash, fish, powershell, nushell
 ```
 
-For mise-completions-sync:
-
-```toml
-ssts = { provided_by = "starship-theme-selector", zsh = "ssts completion zsh", bash = "ssts completion bash", fish = "ssts completion fish" }
-```
