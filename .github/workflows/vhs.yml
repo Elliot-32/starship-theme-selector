@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - uses: actions/setup-go@v6
@@ -39,7 +40,13 @@ jobs:
           install-fonts: true
 
       - name: Commit rendered demo
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'pull_request' &&
+           github.event.pull_request.head.repo.full_name == github.repository &&
+           github.actor != 'dependabot[bot]') ||
+          (github.event_name == 'workflow_dispatch' &&
+           startsWith(github.ref, 'refs/heads/'))
         run: |
           test -f docs/demo.gif
           git add -f docs/demo.gif

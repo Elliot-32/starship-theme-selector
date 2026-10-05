@@ -17,16 +17,12 @@ Enter
 Wait+Screen@10s /Starship Theme Selector/
 Sleep 1s
 
-Down@250ms 4
-Sleep 800ms
-Up@250ms 2
-Sleep 800ms
-
 Type "/"
-Type@90ms "tokyo-night"
-Wait+Screen@10s /tokyo-night/
+Type@90ms "pure-preset"
+Wait+Screen@10s /Preview — pure-preset/
 Sleep 1s
 Enter
 Sleep 500ms
 Enter
+Wait+Screen@10s /Applied built-in Starship theme: pure-preset/
 Sleep 2s
