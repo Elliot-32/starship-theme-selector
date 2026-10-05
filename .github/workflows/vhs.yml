@@ -30,16 +30,18 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       - name: Install Starship
-        run: curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$RUNNER_TEMP/bin"
+        run: curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$RUNNER_TEMP/bin" --version v1.26.0
 
-      - name: Install VHS
-        uses: charmbracelet/vhs-action@v2.1.1
-        with:
-          version: v0.12.0
-          install-fonts: true
+      - name: Prepare CI tape
+        run: |
+          sed "s|^Output .*|Output $GITHUB_WORKSPACE/docs/demo.gif|" docs/demo.tape > "$RUNNER_TEMP/demo.tape"
+          grep -F "Output $GITHUB_WORKSPACE/docs/demo.gif" "$RUNNER_TEMP/demo.tape"
 
       - name: Render demo
-        run: vhs docs/demo.tape
+        uses: charmbracelet/vhs-action@v2.1.1
+        with:
+          path: ${{ runner.temp }}/demo.tape
+          version: v0.12.0
 
       - name: Commit rendered demo
         if: >-

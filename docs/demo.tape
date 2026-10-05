@@ -4,7 +4,7 @@ Require ssts
 Require starship
 
 Set Shell "bash"
-Set FontFamily "FiraCode Nerd Font"
+Set FontFamily "JetBrains Mono"
 Set FontSize 22
 Set Width 1200
 Set Height 720
