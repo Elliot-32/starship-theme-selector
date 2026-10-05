@@ -58,29 +58,38 @@ esac
 	}
 }
 
-func TestViewHeightIsStableAcrossPreviewStates(t *testing.T) {
-	model := New(nil, []theme.Theme{{Name: "demo", Source: theme.SourceBuiltin}})
-	model.width = 72
-	model.height = 24
-	model.resize()
+func TestPreviewPanelKeepsFixedOuterSizeAcrossPreviewStates(t *testing.T) {
+	for _, width := range []int{72, 140} {
+		model := New(nil, []theme.Theme{{Name: "demo", Source: theme.SourceBuiltin}})
+		model.width = width
+		model.height = 24
+		model.resize()
 
-	loadingHeight := lipgloss.Height(model.viewString())
-	if loadingHeight != model.height {
-		t.Fatalf("loading view height = %d, want %d", loadingHeight, model.height)
-	}
+		loadingPanel := model.previewPanel()
+		loadingWidth, loadingHeight := lipgloss.Size(loadingPanel)
+		if loadingWidth != model.previewPanelWidth() {
+			t.Fatalf("width %d: loading panel width = %d, want %d", width, loadingWidth, model.previewPanelWidth())
+		}
+		if loadingHeight != previewFrameHeight {
+			t.Fatalf("width %d: loading panel height = %d, want %d", width, loadingHeight, previewFrameHeight)
+		}
 
-	model.previewFor = "demo"
-	model.preview = "\x1b[31mthis is a rendered Starship preview with enough content to wrap across the panel\x1b[0m"
-	loadedHeight := lipgloss.Height(model.viewString())
-	if loadedHeight != model.height {
-		t.Fatalf("loaded view height = %d, want %d", loadedHeight, model.height)
-	}
-	if loadingHeight != loadedHeight {
-		t.Fatalf("view height changed from %d to %d", loadingHeight, loadedHeight)
-	}
+		loadingViewHeight := lipgloss.Height(model.viewString())
+		model.previewFor = "demo"
+		model.preview = "\x1b[31mthis is a rendered Starship preview with enough content to wrap across the panel\x1b[0m"
 
-	view := model.View()
-	if !view.AltScreen {
-		t.Fatal("TUI view must use the alternate screen")
+		loadedPanel := model.previewPanel()
+		loadedWidth, loadedHeight := lipgloss.Size(loadedPanel)
+		if loadedWidth != loadingWidth || loadedHeight != loadingHeight {
+			t.Fatalf("width %d: panel size changed from %dx%d to %dx%d", width, loadingWidth, loadingHeight, loadedWidth, loadedHeight)
+		}
+		if loadedViewHeight := lipgloss.Height(model.viewString()); loadedViewHeight != loadingViewHeight {
+			t.Fatalf("width %d: view height changed from %d to %d", width, loadingViewHeight, loadedViewHeight)
+		}
+
+		view := model.View()
+		if !view.AltScreen {
+			t.Fatal("TUI view must use the alternate screen")
+		}
 	}
 }

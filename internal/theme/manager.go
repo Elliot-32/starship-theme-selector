@@ -250,18 +250,25 @@ func CreatePreviewProject(ctx context.Context) (string, func(), error) {
 		cleanup()
 		return "", nil, fmt.Errorf("create preview project directory: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/stheme-preview\n\ngo 1.26\n"), 0o644); err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("write preview go.mod: %w", err)
+	projectFiles := map[string][]byte{
+		"pyproject.toml": []byte("[project]\nname = 'stheme-preview'\nversion = '0.1.0'\nrequires-python = '>=3.11'\n"),
+		"main.py":        []byte("print('stheme preview')\n"),
+	}
+	for name, data := range projectFiles {
+		if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
+			cleanup()
+			return "", nil, fmt.Errorf("write preview %s: %w", name, err)
+		}
 	}
 
 	// Git is optional for stheme itself, but when available we make the preview
 	// a real repository so Starship renders git_branch/git_status exactly as it
-	// would in a project. The committed go.mod keeps the preview status clean.
+	// would in a project. The committed Python project files keep the preview
+	// status clean.
 	if git, err := exec.LookPath("git"); err == nil {
 		commands := [][]string{
 			{"-C", dir, "init", "-q", "-b", "main"},
-			{"-C", dir, "add", "go.mod"},
+			{"-C", dir, "add", "pyproject.toml", "main.py"},
 			{"-C", dir, "-c", "user.name=stheme", "-c", "user.email=preview@invalid", "commit", "-qm", "preview"},
 		}
 		for _, args := range commands {

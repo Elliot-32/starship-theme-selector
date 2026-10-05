@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	wideBreakpoint       = 90
-	previewContentHeight = 7
-	previewFrameHeight   = previewContentHeight + 4 // border + vertical padding
+	wideBreakpoint         = 90
+	previewPanelHeight     = 10
+	previewHorizontalFrame = 6 // 2 border cells + 2 cells of padding on each side
+	previewFrameHeight     = previewPanelHeight
 )
 
 var (
@@ -122,14 +123,17 @@ func (m *Model) resize() {
 
 func (m Model) previewPanelWidth() int {
 	if m.width < wideBreakpoint {
-		return max(26, m.width-2)
+		return max(previewHorizontalFrame+16, m.width-2)
 	}
-	return max(30, m.width-m.list.Width()-2)
+	return max(previewHorizontalFrame+20, m.width-m.list.Width()-2)
+}
+
+func (m Model) previewContentWidth() int {
+	return max(16, m.previewPanelWidth()-previewHorizontalFrame)
 }
 
 func (m Model) previewWidth() int {
-	// Leave room for the preview panel's border and horizontal padding.
-	return max(20, m.previewPanelWidth()-6)
+	return max(20, m.previewContentWidth())
 }
 
 func (m Model) previewCmd(t theme.Theme) tea.Cmd {
@@ -228,7 +232,7 @@ func (m Model) previewPanel() string {
 		preview = "(empty prompt)"
 	}
 
-	innerWidth := max(16, m.previewPanelWidth()-6)
+	innerWidth := m.previewContentWidth()
 	preview = lipgloss.Wrap(preview, innerWidth, " ")
 	help := helpStyle.Render("Enter apply • / filter • ↑/↓ move • Esc/q quit")
 	body := panelTitle.Render(name) + "\n\n" + preview + "\n\n" + help
@@ -239,8 +243,8 @@ func (m Model) previewPanel() string {
 		Padding(1, 2).
 		Width(m.previewPanelWidth()).
 		MaxWidth(m.previewPanelWidth()).
-		Height(previewContentHeight).
-		MaxHeight(previewContentHeight).
+		Height(previewPanelHeight).
+		MaxHeight(previewPanelHeight).
 		Render(body)
 }
 
@@ -257,15 +261,11 @@ func (m Model) viewString() string {
 		content = lipgloss.JoinVertical(lipgloss.Left, m.list.View(), panel)
 	}
 
-	// Bubble Tea's renderer works best when every frame occupies the same area.
-	// Pinning the complete view prevents async preview updates from shrinking and
-	// growing the frame, which otherwise leaves duplicate title lines behind.
-	return lipgloss.NewStyle().
-		Width(m.width).
-		MaxWidth(m.width).
-		Height(m.height).
-		MaxHeight(m.height).
-		Render(content)
+	// The preview panel itself has fixed outer dimensions, so async preview
+	// updates cannot change the layout. Alt-screen rendering handles redraws;
+	// forcing the entire view to terminal height would unnecessarily stretch
+	// the list/panel composition.
+	return content
 }
 
 func (m Model) View() tea.View {

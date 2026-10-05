@@ -121,7 +121,7 @@ exit 1
 	}
 }
 
-func TestCreatePreviewProjectProvidesGoAndGitContext(t *testing.T) {
+func TestCreatePreviewProjectProvidesPythonAndGitContext(t *testing.T) {
 	dir, cleanup, err := CreatePreviewProject(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -131,8 +131,10 @@ func TestCreatePreviewProjectProvidesGoAndGitContext(t *testing.T) {
 	if filepath.Base(dir) != "stheme-preview" {
 		t.Fatalf("preview dir base = %q, want stheme-preview", filepath.Base(dir))
 	}
-	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
-		t.Fatalf("preview go.mod: %v", err)
+	for _, name := range []string{"pyproject.toml", "main.py"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Fatalf("preview %s: %v", name, err)
+		}
 	}
 
 	if git, err := exec.LookPath("git"); err == nil {
@@ -153,7 +155,7 @@ func TestPreviewRunsStarshipInsidePreviewProject(t *testing.T) {
 	if err := os.Mkdir(previewDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(previewDir, "go.mod"), []byte("module example.com/preview\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(previewDir, "pyproject.toml"), []byte("[project]\nname = 'preview'\nversion = '0.1.0'\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -164,7 +166,7 @@ if [ "$1" = preset ]; then
   exit 0
 fi
 if [ "$1" = prompt ]; then
-  test -f go.mod || exit 8
+  test -f pyproject.toml || exit 8
   printf 'cwd=%s' "$PWD"
   exit 0
 fi
