@@ -56,7 +56,7 @@ Custom themes take precedence over built-in presets with the same name.
 Generate completion with:
 
 ```sh
-ssts completion zsh
+ssts completion zsh        # or bash, fish, powershell, nushell
 ```
 
 For mise-completions-sync:

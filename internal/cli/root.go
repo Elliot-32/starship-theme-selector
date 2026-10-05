@@ -84,10 +84,10 @@ func newRoot(version string, manager *theme.Manager) *cobra.Command {
 	})
 
 	completion := &cobra.Command{
-		Use:       "completion [zsh|bash|fish|powershell]",
+		Use:       "completion [zsh|bash|fish|powershell|nushell]",
 		Short:     "Generate shell completion",
 		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{"zsh", "bash", "fish", "powershell"},
+		ValidArgs: []string{"zsh", "bash", "fish", "powershell", "nushell"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch args[0] {
 			case "zsh":
@@ -98,6 +98,8 @@ func newRoot(version string, manager *theme.Manager) *cobra.Command {
 				return root.GenFishCompletion(cmd.OutOrStdout(), true)
 			case "powershell":
 				return root.GenPowerShellCompletion(cmd.OutOrStdout())
+			case "nushell":
+				return genNushellCompletion(cmd.OutOrStdout())
 			default:
 				return fmt.Errorf("unsupported shell %q", args[0])
 			}
