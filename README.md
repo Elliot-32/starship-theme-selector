@@ -2,6 +2,12 @@
 
 A Starship theme picker with live preview.
 
+![Starship Theme Selector](docs/screenshot.png)
+
+## Requirements
+
+[Starship](https://starship.rs/) must be installed and available as `starship` in `PATH`.
+
 ## Install
 
 ```sh
@@ -13,8 +19,6 @@ Or with Go:
 ```sh
 go install github.com/Elliot-32/starship-theme-selector/cmd/ssts@latest
 ```
-
-`starship` must be available in `PATH`.
 
 ## Usage
 
