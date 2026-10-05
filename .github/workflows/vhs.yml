@@ -34,13 +34,15 @@ jobs:
 
       - name: Prepare CI tape
         run: |
-          sed "s|^Output .*|Output \"$GITHUB_WORKSPACE/docs/demo.gif\"|" docs/demo.tape > "$RUNNER_TEMP/demo.tape"
-          grep -F "Output \"$GITHUB_WORKSPACE/docs/demo.gif\"" "$RUNNER_TEMP/demo.tape"
+          {
+            echo 'Output demo.gif'
+            tail -n +2 docs/demo.tape
+          } > .vhs-ci.tape
 
       - name: Render demo
         uses: charmbracelet/vhs-action@v2.1.1
         with:
-          path: ${{ runner.temp }}/demo.tape
+          path: .vhs-ci.tape
           version: v0.12.0
 
       - name: Commit rendered demo
@@ -52,7 +54,9 @@ jobs:
           (github.event_name == 'workflow_dispatch' &&
            startsWith(github.ref, 'refs/heads/'))
         run: |
-          test -f docs/demo.gif
+          test -f demo.gif
+          mv demo.gif docs/demo.gif
+          rm -f .vhs-ci.tape
           git add -f docs/demo.gif
 
           if git diff --cached --quiet; then
