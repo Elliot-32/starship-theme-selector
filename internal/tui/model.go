@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Elliot-32/starship-theme-selector/internal/theme"
 )
@@ -18,6 +19,8 @@ const (
 	previewPanelHeight     = 10
 	previewPromptLines     = 2
 	previewHorizontalFrame = 6 // 2 border cells + 2 cells of padding on each side
+	previewSafetyColumns   = 1 // avoid terminal auto-wrap on the last content cell
+	layoutRightMargin      = 1 // never render the whole view into the terminal's last column
 	previewFrameHeight     = previewPanelHeight
 )
 
@@ -123,14 +126,22 @@ func (m *Model) resize() {
 }
 
 func (m Model) previewPanelWidth() int {
+	available := max(1, m.width-layoutRightMargin)
 	if m.width < wideBreakpoint {
-		return max(previewHorizontalFrame+16, m.width-2)
+		desired := max(previewHorizontalFrame+16, m.width-2-layoutRightMargin)
+		return min(desired, available)
 	}
-	return max(previewHorizontalFrame+20, m.width-m.list.Width()-2)
+
+	listWidth := lipgloss.Width(m.list.View())
+	return max(1, m.width-listWidth-2-layoutRightMargin)
 }
 
 func (m Model) previewContentWidth() int {
-	return max(16, m.previewPanelWidth()-previewHorizontalFrame)
+	return max(1, m.previewPanelWidth()-previewHorizontalFrame)
+}
+
+func (m Model) previewRenderWidth() int {
+	return max(1, m.previewContentWidth()-previewSafetyColumns)
 }
 
 func (m Model) previewWidth() int {
@@ -216,6 +227,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func clampPreview(preview string, width, maxLines int) string {
+	preview = strings.Trim(preview, "\r\n")
+	width = max(1, width)
+	maxLines = max(1, maxLines)
+
+	wrapped := ansi.Wrap(preview, width, " ")
+	lines := strings.Split(wrapped, "\n")
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+	}
+	for i, line := range lines {
+		lines[i] = ansi.Truncate(line, width, "")
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (m Model) previewPanel() string {
 	selected := m.selected()
 	name := "Preview"
@@ -233,9 +260,7 @@ func (m Model) previewPanel() string {
 		preview = "(empty prompt)"
 	}
 
-	innerWidth := m.previewContentWidth()
-	preview = lipgloss.Wrap(preview, innerWidth, " ")
-	preview = lipgloss.NewStyle().MaxHeight(previewPromptLines).Render(preview)
+	preview = clampPreview(preview, m.previewRenderWidth(), previewPromptLines)
 	help := helpStyle.Render("Enter apply • / filter • ↑/↓ move • Esc/q quit")
 	body := panelTitle.Render(name) + "\n\n" + preview + "\n\n" + help
 

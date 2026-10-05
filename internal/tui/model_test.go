@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Elliot-32/starship-theme-selector/internal/theme"
 )
@@ -93,6 +94,39 @@ func TestPreviewPanelKeepsFixedOuterSizeAcrossPreviewStates(t *testing.T) {
 		view := model.View()
 		if !view.AltScreen {
 			t.Fatal("TUI view must use the alternate screen")
+		}
+	}
+}
+
+func TestClampPreviewNeverExceedsSafeWidth(t *testing.T) {
+	const width = 24
+	preview := "\x1b[38;5;212m  elliot \x1b[0m\ue0b0 \x1b[38;5;220m\uf126 main\x1b[0m \ue0b0 \x1b[32m\ue73c v3.14.7\x1b[0m \ue0b0 19:23 \ue0b0"
+
+	got := clampPreview(preview, width, previewPromptLines)
+	lines := strings.Split(got, "\n")
+	if len(lines) > previewPromptLines {
+		t.Fatalf("preview has %d lines, want at most %d", len(lines), previewPromptLines)
+	}
+	for i, line := range lines {
+		if gotWidth := ansi.StringWidth(line); gotWidth > width {
+			t.Fatalf("line %d width = %d, want <= %d: %q", i, gotWidth, width, line)
+		}
+	}
+}
+
+func TestViewReservesRightmostTerminalColumn(t *testing.T) {
+	for _, width := range []int{72, 90, 140} {
+		model := New(nil, []theme.Theme{{Name: "catppuccin-powerline", Source: theme.SourceBuiltin}})
+		model.width = width
+		model.height = 24
+		model.resize()
+		model.previewFor = "catppuccin-powerline"
+		model.preview = "\x1b[38;5;212m  elliot \x1b[0m\ue0b0 \x1b[38;5;220m\uf126 main\x1b[0m \ue0b0 \x1b[32m\ue73c v3.14.7\x1b[0m \ue0b0 19:23 \ue0b0"
+
+		gotWidth := lipgloss.Width(model.viewString())
+		wantMax := width - layoutRightMargin
+		if gotWidth > wantMax {
+			t.Fatalf("terminal width %d: view width = %d, want <= %d", width, gotWidth, wantMax)
 		}
 	}
 }
