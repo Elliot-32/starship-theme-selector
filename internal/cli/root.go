@@ -58,6 +58,15 @@ func newRoot(version string, manager *theme.Manager) *cobra.Command {
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	root.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print version",
+		Args:  cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			fmt.Fprintf(cmd.OutOrStdout(), "stheme version %s\n", version)
+		},
+	})
+
+	root.AddCommand(&cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List built-in and custom themes",
