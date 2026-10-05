@@ -34,8 +34,8 @@ jobs:
 
       - name: Prepare CI tape
         run: |
-          sed "s|^Output .*|Output $GITHUB_WORKSPACE/docs/demo.gif|" docs/demo.tape > "$RUNNER_TEMP/demo.tape"
-          grep -F "Output $GITHUB_WORKSPACE/docs/demo.gif" "$RUNNER_TEMP/demo.tape"
+          sed "s|^Output .*|Output \"$GITHUB_WORKSPACE/docs/demo.gif\"|" docs/demo.tape > "$RUNNER_TEMP/demo.tape"
+          grep -F "Output \"$GITHUB_WORKSPACE/docs/demo.gif\"" "$RUNNER_TEMP/demo.tape"
 
       - name: Render demo
         uses: charmbracelet/vhs-action@v2.1.1
