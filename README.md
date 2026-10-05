@@ -62,5 +62,5 @@ ssts completion zsh
 For mise-completions-sync:
 
 ```toml
-ssts = "standard"
+ssts = { provided_by = "starship-theme-selector", zsh = "ssts completion zsh", bash = "ssts completion bash", fish = "ssts completion fish" }
 ```
