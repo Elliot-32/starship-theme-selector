@@ -32,12 +32,14 @@ jobs:
       - name: Install Starship
         run: curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$RUNNER_TEMP/bin"
 
-      - name: Render demo
+      - name: Install VHS
         uses: charmbracelet/vhs-action@v2.1.1
         with:
-          path: docs/demo.tape
           version: v0.12.0
           install-fonts: true
+
+      - name: Render demo
+        run: vhs docs/demo.tape
 
       - name: Commit rendered demo
         if: >-
