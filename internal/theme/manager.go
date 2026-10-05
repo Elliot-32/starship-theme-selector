@@ -227,6 +227,17 @@ func (m *Manager) Build(ctx context.Context, item Theme) ([]byte, error) {
 	return Merge(themeData, symbolsData)
 }
 
+func previewEnvironment(configPath string) []string {
+	env := make([]string, 0, len(os.Environ())+1)
+	for _, entry := range os.Environ() {
+		if strings.HasPrefix(entry, "STARSHIP_SHELL=") || strings.HasPrefix(entry, "STARSHIP_CONFIG=") {
+			continue
+		}
+		env = append(env, entry)
+	}
+	return append(env, "STARSHIP_CONFIG="+configPath)
+}
+
 func (m *Manager) render(ctx context.Context, config []byte, width int) (string, error) {
 	tmp, err := os.CreateTemp("", "stheme-preview-*.toml")
 	if err != nil {
@@ -251,7 +262,7 @@ func (m *Manager) render(ctx context.Context, config []byte, width int) (string,
 		"--terminal-width", fmt.Sprint(width),
 		"--path", m.WorkDir,
 	)
-	cmd.Env = append(os.Environ(), "STARSHIP_CONFIG="+name)
+	cmd.Env = previewEnvironment(name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		message := strings.TrimSpace(string(out))

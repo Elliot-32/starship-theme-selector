@@ -74,3 +74,48 @@ exit 1
 		t.Fatalf("alpha = %#v", themes[0])
 	}
 }
+
+func TestPreviewDoesNotLeakShellPromptEscapes(t *testing.T) {
+	dir := t.TempDir()
+	starship := filepath.Join(dir, "starship")
+	script := `#!/bin/sh
+if [ "$1" = preset ] && [ "$2" = demo ]; then
+  printf 'format = "$character"\n'
+  exit 0
+fi
+if [ "$1" = prompt ]; then
+  if [ -n "$STARSHIP_SHELL" ]; then
+    printf '%%{wrapped%%}'
+  else
+    printf '\033[31mraw-preview\033[0m'
+  fi
+  exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(starship, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("STARSHIP_SHELL", "zsh")
+	t.Setenv("STARSHIP_CONFIG", "/should/not/leak")
+
+	m := &Manager{
+		Starship: starship,
+		Paths: Paths{
+			SymbolsFile: filepath.Join(dir, "missing-symbols.toml"),
+		},
+		DefaultSymbols: []byte("[os.symbols]\nCachyOS = 'cachy'\n"),
+		WorkDir:        dir,
+	}
+
+	preview, err := m.Preview(t.Context(), Theme{Name: "demo", Source: SourceBuiltin}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(preview, "%{") || strings.Contains(preview, "%}") || strings.Contains(preview, "wrapped") {
+		t.Fatalf("preview leaked shell prompt escapes: %q", preview)
+	}
+	if !strings.Contains(preview, "\x1b[31mraw-preview\x1b[0m") {
+		t.Fatalf("preview lost ANSI rendering: %q", preview)
+	}
+}
