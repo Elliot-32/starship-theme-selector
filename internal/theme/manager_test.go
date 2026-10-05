@@ -224,3 +224,87 @@ exit 1
 		t.Fatalf("preview = %q, want cwd=%s", preview, previewDir)
 	}
 }
+
+func TestAtomicWritePreservesSymlinkAndTargetMode(t *testing.T) {
+	dir := t.TempDir()
+	targetDir := filepath.Join(dir, "managed")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	realTarget := filepath.Join(targetDir, "starship.toml")
+	if err := os.WriteFile(realTarget, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "starship.toml")
+	if err := os.Symlink(filepath.Join("managed", "starship.toml"), link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := atomicWrite(link, []byte("new\n")); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("%s is no longer a symlink", link)
+	}
+	data, err := os.ReadFile(realTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new\n" {
+		t.Fatalf("target content = %q, want new", data)
+	}
+	targetInfo, err := os.Stat(realTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := targetInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("target mode = %o, want 600", got)
+	}
+}
+
+func TestAtomicWritePreservesDanglingSymlink(t *testing.T) {
+	dir := t.TempDir()
+	realTarget := filepath.Join(dir, "managed", "starship.toml")
+	link := filepath.Join(dir, "starship.toml")
+	if err := os.Symlink(filepath.Join("managed", "starship.toml"), link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := atomicWrite(link, []byte("new\n")); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("%s is no longer a symlink", link)
+	}
+	data, err := os.ReadFile(realTarget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new\n" {
+		t.Fatalf("target content = %q, want new", data)
+	}
+}
+
+func TestResolveWriteTargetRejectsSymlinkLoop(t *testing.T) {
+	dir := t.TempDir()
+	a := filepath.Join(dir, "a")
+	b := filepath.Join(dir, "b")
+	if err := os.Symlink("b", a); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("a", b); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveWriteTarget(a); err == nil || !strings.Contains(err.Error(), "symlink loop") {
+		t.Fatalf("resolveWriteTarget loop error = %v", err)
+	}
+}

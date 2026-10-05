@@ -335,22 +335,49 @@ func (m *Manager) Preview(ctx context.Context, item Theme, width int) (string, e
 	return m.render(ctx, config, width, workDir)
 }
 
-func (m *Manager) Apply(ctx context.Context, item Theme) error {
-	config, err := m.Build(ctx, item)
+func resolveWriteTarget(path string) (string, error) {
+	seen := make(map[string]struct{})
+	current := filepath.Clean(path)
+	for {
+		if _, ok := seen[current]; ok {
+			return "", fmt.Errorf("resolve Starship config target: symlink loop at %s", current)
+		}
+		seen[current] = struct{}{}
+
+		info, err := os.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return current, nil
+		}
+		if err != nil {
+			return "", fmt.Errorf("inspect Starship config target: %w", err)
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			return current, nil
+		}
+
+		next, err := os.Readlink(current)
+		if err != nil {
+			return "", fmt.Errorf("read Starship config symlink: %w", err)
+		}
+		if !filepath.IsAbs(next) {
+			next = filepath.Join(filepath.Dir(current), next)
+		}
+		current = filepath.Clean(next)
+	}
+}
+
+func atomicWrite(path string, data []byte) error {
+	target, err := resolveWriteTarget(path)
 	if err != nil {
 		return err
 	}
-	if _, err := m.render(ctx, config, 80, m.WorkDir); err != nil {
-		return err
-	}
-
-	dir := filepath.Dir(m.Paths.Target)
+	dir := filepath.Dir(target)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create Starship config directory: %w", err)
 	}
 
 	mode := os.FileMode(0o644)
-	if info, err := os.Stat(m.Paths.Target); err == nil {
+	if info, err := os.Stat(target); err == nil {
 		mode = info.Mode().Perm()
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("stat existing Starship config: %w", err)
@@ -372,7 +399,7 @@ func (m *Manager) Apply(ctx context.Context, item Theme) error {
 		tmp.Close()
 		return fmt.Errorf("set temporary config mode: %w", err)
 	}
-	if _, err := bytes.NewReader(config).WriteTo(tmp); err != nil {
+	if _, err := bytes.NewReader(data).WriteTo(tmp); err != nil {
 		tmp.Close()
 		return fmt.Errorf("write temporary Starship config: %w", err)
 	}
@@ -383,9 +410,20 @@ func (m *Manager) Apply(ctx context.Context, item Theme) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("close temporary Starship config: %w", err)
 	}
-	if err := os.Rename(tmpName, m.Paths.Target); err != nil {
+	if err := os.Rename(tmpName, target); err != nil {
 		return fmt.Errorf("replace Starship config: %w", err)
 	}
 	cleanup = false
 	return nil
+}
+
+func (m *Manager) Apply(ctx context.Context, item Theme) error {
+	config, err := m.Build(ctx, item)
+	if err != nil {
+		return err
+	}
+	if _, err := m.render(ctx, config, 80, m.WorkDir); err != nil {
+		return err
+	}
+	return atomicWrite(m.Paths.Target, config)
 }
