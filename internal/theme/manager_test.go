@@ -121,6 +121,39 @@ exit 1
 	}
 }
 
+func TestPreviewTrimsOuterNewlines(t *testing.T) {
+	dir := t.TempDir()
+	starship := filepath.Join(dir, "starship")
+	script := `#!/bin/sh
+if [ "$1" = preset ]; then
+  printf 'format = "$character"\n'
+  exit 0
+fi
+if [ "$1" = prompt ]; then
+  printf '\nfirst line\nsecond line\n\n'
+  exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(starship, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{
+		Starship:       starship,
+		Paths:          Paths{SymbolsFile: filepath.Join(dir, "missing.toml")},
+		DefaultSymbols: []byte("[os.symbols]\nCachyOS = 'cachy'\n"),
+		WorkDir:        dir,
+	}
+	preview, err := m.Preview(t.Context(), Theme{Name: "demo", Source: SourceBuiltin}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview != "first line\nsecond line" {
+		t.Fatalf("preview = %q, want outer newlines trimmed", preview)
+	}
+}
+
 func TestCreatePreviewProjectProvidesPythonAndGitContext(t *testing.T) {
 	dir, cleanup, err := CreatePreviewProject(t.Context())
 	if err != nil {

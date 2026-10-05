@@ -320,7 +320,7 @@ func (m *Manager) render(ctx context.Context, config []byte, width int, workDir 
 		}
 		return "", fmt.Errorf("render preview: %s", message)
 	}
-	return strings.TrimRight(string(out), "\r\n"), nil
+	return strings.Trim(string(out), "\r\n"), nil
 }
 
 func (m *Manager) Preview(ctx context.Context, item Theme, width int) (string, error) {

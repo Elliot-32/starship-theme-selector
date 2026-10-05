@@ -16,6 +16,7 @@ import (
 const (
 	wideBreakpoint         = 90
 	previewPanelHeight     = 10
+	previewPromptLines     = 2
 	previewHorizontalFrame = 6 // 2 border cells + 2 cells of padding on each side
 	previewFrameHeight     = previewPanelHeight
 )
@@ -234,6 +235,7 @@ func (m Model) previewPanel() string {
 
 	innerWidth := m.previewContentWidth()
 	preview = lipgloss.Wrap(preview, innerWidth, " ")
+	preview = lipgloss.NewStyle().MaxHeight(previewPromptLines).Render(preview)
 	help := helpStyle.Render("Enter apply • / filter • ↑/↓ move • Esc/q quit")
 	body := panelTitle.Render(name) + "\n\n" + preview + "\n\n" + help
 

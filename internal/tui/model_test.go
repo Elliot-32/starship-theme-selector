@@ -76,12 +76,15 @@ func TestPreviewPanelKeepsFixedOuterSizeAcrossPreviewStates(t *testing.T) {
 
 		loadingViewHeight := lipgloss.Height(model.viewString())
 		model.previewFor = "demo"
-		model.preview = "\x1b[31mthis is a rendered Starship preview with enough content to wrap across the panel\x1b[0m"
+		model.preview = "\n\x1b[31mline one\x1b[0m\nline two\nline three\nline four"
 
 		loadedPanel := model.previewPanel()
 		loadedWidth, loadedHeight := lipgloss.Size(loadedPanel)
 		if loadedWidth != loadingWidth || loadedHeight != loadingHeight {
 			t.Fatalf("width %d: panel size changed from %dx%d to %dx%d", width, loadingWidth, loadingHeight, loadedWidth, loadedHeight)
+		}
+		if strings.Contains(loadedPanel, "line three") || strings.Contains(loadedPanel, "line four") {
+			t.Fatalf("width %d: preview viewport leaked lines beyond %d rows", width, previewPromptLines)
 		}
 		if loadedViewHeight := lipgloss.Height(model.viewString()); loadedViewHeight != loadingViewHeight {
 			t.Fatalf("width %d: view height changed from %d to %d", width, loadingViewHeight, loadedViewHeight)
