@@ -41,12 +41,14 @@ jobs:
       - name: Commit rendered demo
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
-          if [[ -z "$(git status --porcelain -- docs/demo.gif)" ]]; then
+          test -f docs/demo.gif
+          git add -f docs/demo.gif
+
+          if git diff --cached --quiet; then
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/demo.gif
           git commit -m "docs: regenerate VHS demo"
           git push
