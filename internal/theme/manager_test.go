@@ -2,6 +2,7 @@ package theme
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -117,5 +118,74 @@ exit 1
 	}
 	if !strings.Contains(preview, "\x1b[31mraw-preview\x1b[0m") {
 		t.Fatalf("preview lost ANSI rendering: %q", preview)
+	}
+}
+
+func TestCreatePreviewProjectProvidesGoAndGitContext(t *testing.T) {
+	dir, cleanup, err := CreatePreviewProject(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+
+	if filepath.Base(dir) != "stheme-preview" {
+		t.Fatalf("preview dir base = %q, want stheme-preview", filepath.Base(dir))
+	}
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err != nil {
+		t.Fatalf("preview go.mod: %v", err)
+	}
+
+	if git, err := exec.LookPath("git"); err == nil {
+		cmd := exec.Command(git, "-C", dir, "branch", "--show-current")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatalf("read preview git branch: %v", err)
+		}
+		if strings.TrimSpace(string(out)) != "main" {
+			t.Fatalf("preview branch = %q, want main", strings.TrimSpace(string(out)))
+		}
+	}
+}
+
+func TestPreviewRunsStarshipInsidePreviewProject(t *testing.T) {
+	dir := t.TempDir()
+	previewDir := filepath.Join(dir, "preview")
+	if err := os.Mkdir(previewDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(previewDir, "go.mod"), []byte("module example.com/preview\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	starship := filepath.Join(dir, "starship")
+	script := `#!/bin/sh
+if [ "$1" = preset ]; then
+  printf 'format = "$character"\n'
+  exit 0
+fi
+if [ "$1" = prompt ]; then
+  test -f go.mod || exit 8
+  printf 'cwd=%s' "$PWD"
+  exit 0
+fi
+exit 1
+`
+	if err := os.WriteFile(starship, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	m := &Manager{
+		Starship:       starship,
+		Paths:          Paths{SymbolsFile: filepath.Join(dir, "missing.toml")},
+		DefaultSymbols: []byte("[os.symbols]\nCachyOS = 'cachy'\n"),
+		WorkDir:        dir,
+		PreviewDir:     previewDir,
+	}
+	preview, err := m.Preview(t.Context(), Theme{Name: "demo", Source: SourceBuiltin}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if preview != "cwd="+previewDir {
+		t.Fatalf("preview = %q, want cwd=%s", preview, previewDir)
 	}
 }

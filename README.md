@@ -6,6 +6,8 @@ A small Starship theme picker and applier with an interactive Bubble Tea preview
 
 - `stheme` opens an interactive theme picker.
 - The selected theme is previewed with a real `starship prompt` render before it is applied.
+- Preview rendering uses a stable synthetic `main` Git repository with a Go project so Git and language modules are visible consistently.
+- The Bubble Tea UI uses a fixed-size Lip Gloss layout and alternate screen to avoid redraw artifacts while previews update.
 - `stheme THEME` applies a theme directly.
 - Built-in Starship presets and custom TOML themes are shown together.
 - `[os.symbols]` is replaced as a complete table, using bundled Nerd Font distro symbols by default.
@@ -16,6 +18,7 @@ A small Starship theme picker and applier with an interactive Bubble Tea preview
 ## Requirements
 
 - `starship` available in `PATH`.
+- `git` is optional; when present, the interactive preview includes a real `main` branch.
 
 ## Install with mise
 

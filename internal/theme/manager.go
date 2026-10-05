@@ -39,6 +39,7 @@ type Manager struct {
 	Paths          Paths
 	DefaultSymbols []byte
 	WorkDir        string
+	PreviewDir     string
 }
 
 func DefaultPaths() (Paths, error) {
@@ -238,7 +239,44 @@ func previewEnvironment(configPath string) []string {
 	return append(env, "STARSHIP_CONFIG="+configPath)
 }
 
-func (m *Manager) render(ctx context.Context, config []byte, width int) (string, error) {
+func CreatePreviewProject(ctx context.Context) (string, func(), error) {
+	root, err := os.MkdirTemp("", "stheme-preview-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("create preview project: %w", err)
+	}
+	cleanup := func() { _ = os.RemoveAll(root) }
+	dir := filepath.Join(root, "stheme-preview")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("create preview project directory: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/stheme-preview\n\ngo 1.26\n"), 0o644); err != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("write preview go.mod: %w", err)
+	}
+
+	// Git is optional for stheme itself, but when available we make the preview
+	// a real repository so Starship renders git_branch/git_status exactly as it
+	// would in a project. The committed go.mod keeps the preview status clean.
+	if git, err := exec.LookPath("git"); err == nil {
+		commands := [][]string{
+			{"-C", dir, "init", "-q", "-b", "main"},
+			{"-C", dir, "add", "go.mod"},
+			{"-C", dir, "-c", "user.name=stheme", "-c", "user.email=preview@invalid", "commit", "-qm", "preview"},
+		}
+		for _, args := range commands {
+			cmd := exec.CommandContext(ctx, git, args...)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				cleanup()
+				return "", nil, fmt.Errorf("prepare preview git repository: %s", strings.TrimSpace(string(out)))
+			}
+		}
+	}
+
+	return dir, cleanup, nil
+}
+
+func (m *Manager) render(ctx context.Context, config []byte, width int, workDir string) (string, error) {
 	tmp, err := os.CreateTemp("", "stheme-preview-*.toml")
 	if err != nil {
 		return "", fmt.Errorf("create preview config: %w", err)
@@ -256,12 +294,16 @@ func (m *Manager) render(ctx context.Context, config []byte, width int) (string,
 	if width < 20 {
 		width = 80
 	}
+	if workDir == "" {
+		workDir = m.WorkDir
+	}
 	cmd := exec.CommandContext(ctx, m.Starship,
 		"prompt",
 		"--status", "0",
 		"--terminal-width", fmt.Sprint(width),
-		"--path", m.WorkDir,
+		"--path", workDir,
 	)
+	cmd.Dir = workDir
 	cmd.Env = previewEnvironment(name)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -279,7 +321,11 @@ func (m *Manager) Preview(ctx context.Context, item Theme, width int) (string, e
 	if err != nil {
 		return "", err
 	}
-	return m.render(ctx, config, width)
+	workDir := m.PreviewDir
+	if workDir == "" {
+		workDir = m.WorkDir
+	}
+	return m.render(ctx, config, width, workDir)
 }
 
 func (m *Manager) Apply(ctx context.Context, item Theme) error {
@@ -287,7 +333,7 @@ func (m *Manager) Apply(ctx context.Context, item Theme) error {
 	if err != nil {
 		return err
 	}
-	if _, err := m.render(ctx, config, 80); err != nil {
+	if _, err := m.render(ctx, config, 80, m.WorkDir); err != nil {
 		return err
 	}
 

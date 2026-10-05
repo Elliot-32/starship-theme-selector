@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/Elliot-32/stheme/internal/theme"
 )
 
@@ -53,5 +55,32 @@ esac
 	}
 	if msg.name != "custom" || !strings.Contains(msg.text, "PREVIEW-MARKER") {
 		t.Fatalf("preview = %#v", msg)
+	}
+}
+
+func TestViewHeightIsStableAcrossPreviewStates(t *testing.T) {
+	model := New(nil, []theme.Theme{{Name: "demo", Source: theme.SourceBuiltin}})
+	model.width = 72
+	model.height = 24
+	model.resize()
+
+	loadingHeight := lipgloss.Height(model.viewString())
+	if loadingHeight != model.height {
+		t.Fatalf("loading view height = %d, want %d", loadingHeight, model.height)
+	}
+
+	model.previewFor = "demo"
+	model.preview = "\x1b[31mthis is a rendered Starship preview with enough content to wrap across the panel\x1b[0m"
+	loadedHeight := lipgloss.Height(model.viewString())
+	if loadedHeight != model.height {
+		t.Fatalf("loaded view height = %d, want %d", loadedHeight, model.height)
+	}
+	if loadingHeight != loadedHeight {
+		t.Fatalf("view height changed from %d to %d", loadingHeight, loadedHeight)
+	}
+
+	view := model.View()
+	if !view.AltScreen {
+		t.Fatal("TUI view must use the alternate screen")
 	}
 }

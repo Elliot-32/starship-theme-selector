@@ -13,6 +13,22 @@ import (
 	"github.com/Elliot-32/stheme/internal/theme"
 )
 
+const (
+	wideBreakpoint       = 90
+	previewContentHeight = 7
+	previewFrameHeight   = previewContentHeight + 4 // border + vertical padding
+)
+
+var (
+	accent       = lipgloss.Color("212")
+	muted        = lipgloss.Color("241")
+	border       = lipgloss.Color("240")
+	panelTitle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252"))
+	helpStyle    = lipgloss.NewStyle().Foreground(muted)
+	loadingStyle = lipgloss.NewStyle().Foreground(muted).Italic(true)
+	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+)
+
 type item struct {
 	theme theme.Theme
 }
@@ -37,16 +53,22 @@ func (delegate) Render(w io.Writer, m list.Model, index int, listItem list.Item)
 	if !ok {
 		return
 	}
+
 	name := i.Title()
-	desc := i.Description()
+	source := i.Description()
+	badge := lipgloss.NewStyle().Foreground(muted).Render(source)
+	if i.theme.Source == theme.SourceCustom {
+		badge = lipgloss.NewStyle().Foreground(lipgloss.Color("114")).Render(source)
+	}
+
 	if index == m.Index() {
-		name = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")).Render("› " + name)
-		desc = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("  " + desc)
+		name = lipgloss.NewStyle().Bold(true).Foreground(accent).Render("› " + name)
+		badge = "  " + badge
 	} else {
 		name = "  " + name
-		desc = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("  " + desc)
+		badge = "  " + badge
 	}
-	fmt.Fprintf(w, "%s\n%s", name, desc)
+	fmt.Fprintf(w, "%s\n%s", name, badge)
 }
 
 type Model struct {
@@ -72,7 +94,10 @@ func New(manager *theme.Manager, themes []theme.Theme) Model {
 	l.SetFilteringEnabled(true)
 	l.SetShowHelp(true)
 	l.AdditionalFullHelpKeys = nil
-	return Model{manager: manager, list: l, width: 100, height: 24}
+
+	m := Model{manager: manager, list: l, width: 100, height: 24}
+	m.resize()
+	return m
 }
 
 func (m Model) selected() *theme.Theme {
@@ -84,11 +109,27 @@ func (m Model) selected() *theme.Theme {
 	return &t
 }
 
-func (m Model) previewWidth() int {
-	if m.width < 90 {
-		return max(30, m.width-4)
+func (m *Model) resize() {
+	if m.width >= wideBreakpoint {
+		listWidth := max(34, min(48, m.width*2/5))
+		m.list.SetSize(listWidth, max(8, m.height))
+		return
 	}
-	return max(30, m.width-m.list.Width()-8)
+
+	listHeight := max(6, m.height-previewFrameHeight-1)
+	m.list.SetSize(max(30, m.width), listHeight)
+}
+
+func (m Model) previewPanelWidth() int {
+	if m.width < wideBreakpoint {
+		return max(26, m.width-2)
+	}
+	return max(30, m.width-m.list.Width()-2)
+}
+
+func (m Model) previewWidth() int {
+	// Leave room for the preview panel's border and horizontal padding.
+	return max(20, m.previewPanelWidth()-6)
 }
 
 func (m Model) previewCmd(t theme.Theme) tea.Cmd {
@@ -109,12 +150,8 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		if m.width >= 90 {
-			m.list.SetSize(max(34, m.width*2/5), max(10, m.height-2))
-		} else {
-			m.list.SetSize(max(30, m.width-2), max(8, m.height*3/5))
-		}
+		m.width, m.height = max(1, msg.Width), max(1, msg.Height)
+		m.resize()
 		if selected := m.selected(); selected != nil {
 			return m, m.previewCmd(*selected)
 		}
@@ -174,42 +211,67 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) View() tea.View {
-	if m.quitting {
-		return tea.NewView("")
-	}
-
+func (m Model) previewPanel() string {
 	selected := m.selected()
 	name := "Preview"
 	if selected != nil {
 		name = "Preview — " + selected.Name
 	}
+
 	preview := m.preview
 	if m.previewErr != nil {
-		preview = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(m.previewErr.Error())
+		preview = errorStyle.Render(m.previewErr.Error())
 	} else if preview == "" || selected == nil || m.previewFor != selected.Name {
-		preview = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("Rendering Starship preview…")
+		preview = loadingStyle.Render("Rendering Starship preview…")
 	}
 	if strings.TrimSpace(preview) == "" {
 		preview = "(empty prompt)"
 	}
 
-	previewStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		Padding(1, 2)
-	previewTitle := lipgloss.NewStyle().Bold(true).Render(name)
-	help := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render("Enter apply • / filter • ↑/↓ move • Esc/q quit")
+	innerWidth := max(16, m.previewPanelWidth()-6)
+	preview = lipgloss.Wrap(preview, innerWidth, " ")
+	help := helpStyle.Render("Enter apply • / filter • ↑/↓ move • Esc/q quit")
+	body := panelTitle.Render(name) + "\n\n" + preview + "\n\n" + help
 
-	if m.width >= 90 {
-		pw := max(30, m.previewWidth())
-		panel := previewStyle.Width(pw).Height(max(8, m.height-6)).Render(previewTitle + "\n\n" + preview + "\n\n" + help)
-		content := lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), "  ", panel)
-		return tea.NewView(content)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(border).
+		Padding(1, 2).
+		Width(m.previewPanelWidth()).
+		MaxWidth(m.previewPanelWidth()).
+		Height(previewContentHeight).
+		MaxHeight(previewContentHeight).
+		Render(body)
+}
+
+func (m Model) viewString() string {
+	if m.quitting {
+		return ""
 	}
 
-	panel := previewStyle.Width(max(26, m.width-6)).Render(previewTitle + "\n\n" + preview + "\n\n" + help)
-	return tea.NewView(lipgloss.JoinVertical(lipgloss.Left, m.list.View(), panel))
+	panel := m.previewPanel()
+	var content string
+	if m.width >= wideBreakpoint {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), "  ", panel)
+	} else {
+		content = lipgloss.JoinVertical(lipgloss.Left, m.list.View(), panel)
+	}
+
+	// Bubble Tea's renderer works best when every frame occupies the same area.
+	// Pinning the complete view prevents async preview updates from shrinking and
+	// growing the frame, which otherwise leaves duplicate title lines behind.
+	return lipgloss.NewStyle().
+		Width(m.width).
+		MaxWidth(m.width).
+		Height(m.height).
+		MaxHeight(m.height).
+		Render(content)
+}
+
+func (m Model) View() tea.View {
+	view := tea.NewView(m.viewString())
+	view.AltScreen = true
+	return view
 }
 
 func (m Model) Choice() *theme.Theme {

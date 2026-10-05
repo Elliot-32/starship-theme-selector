@@ -131,6 +131,14 @@ func runTUI(ctx context.Context, manager *theme.Manager, cmd *cobra.Command) err
 		return fmt.Errorf("no Starship themes found")
 	}
 
+	previewDir, cleanupPreview, err := theme.CreatePreviewProject(ctx)
+	if err != nil {
+		return err
+	}
+	defer cleanupPreview()
+	manager.PreviewDir = previewDir
+	defer func() { manager.PreviewDir = "" }()
+
 	model := tui.New(manager, themes)
 	result, err := tea.NewProgram(model).Run()
 	if err != nil {
