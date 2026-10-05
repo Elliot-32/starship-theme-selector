@@ -1,0 +1,52 @@
+name: VHS Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build ssts
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -o "$RUNNER_TEMP/bin/ssts" ./cmd/ssts
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install Starship
+        run: curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$RUNNER_TEMP/bin"
+
+      - name: Render demo
+        uses: charmbracelet/vhs-action@v2.1.1
+        with:
+          path: docs/demo.tape
+          version: v0.12.0
+          install-fonts: true
+
+      - name: Commit rendered demo
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if [[ -z "$(git status --porcelain -- docs/demo.gif)" ]]; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/demo.gif
+          git commit -m "docs: regenerate VHS demo"
+          git push
