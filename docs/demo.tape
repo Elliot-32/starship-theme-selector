@@ -19,14 +19,14 @@ Env STARSHIP_CONFIG "/tmp/ssts-vhs-demo-starship.toml"
 Type "ssts"
 Hide
 Enter
-Wait+Screen@10s /❯/
+Wait+Screen@10s /v0\.1\.0/
 Show
 Sleep 1s
 
 Type "/"
 Type@90ms "pure-preset"
 Hide
-Wait+Screen@10s /◎/
+Wait+Screen@10s /❯/
 Show
 Sleep 1s
 Enter
