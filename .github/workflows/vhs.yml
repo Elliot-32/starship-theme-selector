@@ -43,7 +43,7 @@ jobs:
         uses: charmbracelet/vhs-action@v2.1.1
         with:
           path: .vhs-ci.tape
-          version: v0.12.0
+          version: v0.12.1
 
       - name: Commit rendered demo
         if: >-
