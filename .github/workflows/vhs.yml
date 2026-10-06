@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: vhs-demo-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   render:
     runs-on: ubuntu-latest
