@@ -1,0 +1,74 @@
+name: VHS Demo
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vhs-demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.3'
+
+      - name: Build ssts
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -o "$RUNNER_TEMP/bin/ssts" ./cmd/ssts
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Install Starship
+        run: curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$RUNNER_TEMP/bin" --version v1.26.0
+
+      - name: Prepare CI tape
+        run: |
+          {
+            echo 'Output demo.gif'
+            tail -n +2 docs/demo.tape
+          } > .vhs-ci.tape
+
+      - name: Render demo
+        uses: charmbracelet/vhs-action@v2.1.1
+        with:
+          path: .vhs-ci.tape
+          version: v0.12.1
+
+      - name: Commit rendered demo
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' &&
+           startsWith(github.ref, 'refs/heads/'))
+        run: |
+          test -f demo.gif
+          mv demo.gif docs/demo.gif
+          rm -f .vhs-ci.tape
+          git add -f docs/demo.gif
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: regenerate VHS demo"
+          git push

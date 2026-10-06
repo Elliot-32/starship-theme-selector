@@ -2,7 +2,7 @@
 
 A Starship theme picker with live preview.
 
-![Starship Theme Selector](docs/screenshot.png)
+![Starship Theme Selector](docs/demo.gif)
 
 ## Requirements
 
@@ -62,4 +62,3 @@ Generate completion with:
 ```sh
 ssts completion zsh        # or bash, fish, powershell, nushell
 ```
-
