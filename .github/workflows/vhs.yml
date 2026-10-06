@@ -27,6 +27,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12.3'
+
       - name: Build ssts
         run: |
           mkdir -p "$RUNNER_TEMP/bin"

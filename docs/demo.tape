@@ -11,6 +11,7 @@ Set Height 720
 Set Padding 18
 Set Framerate 30
 Set TypingSpeed 45ms
+Set CursorBlink false
 
 Env XDG_CONFIG_HOME "/tmp/ssts-vhs-demo-config"
 Env STARSHIP_CONFIG "/tmp/ssts-vhs-demo-starship.toml"
@@ -18,14 +19,14 @@ Env STARSHIP_CONFIG "/tmp/ssts-vhs-demo-starship.toml"
 Type "ssts"
 Hide
 Enter
-Wait+Screen@10s /Starship Theme Selector/
+Wait+Screen@10s /❯/
 Show
 Sleep 1s
 
 Type "/"
 Type@90ms "pure-preset"
 Hide
-Wait+Screen@10s /Preview — pure-preset/
+Wait+Screen@10s /◎/
 Show
 Sleep 1s
 Enter
